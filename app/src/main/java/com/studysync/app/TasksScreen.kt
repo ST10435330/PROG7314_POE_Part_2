@@ -24,8 +24,14 @@ fun TasksScreen(repository: StudyRepository) {
     var reloadKey by remember { mutableIntStateOf(0) }
 
     var showForm by rememberSaveable { mutableStateOf(false) }
+    var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingDeleteId by rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
+
     var saving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(repository, reloadKey) {
         loading = true
@@ -37,6 +43,21 @@ fun TasksScreen(repository: StudyRepository) {
 
             subjects = loadedSubjects
             tasks = loadedTasks
+
+            // A previously selected task may have been removed.
+            if (editingId != null &&
+                loadedTasks.none { it.taskId == editingId }
+            ) {
+                editingId = null
+                showForm = false
+            }
+
+            if (pendingDeleteId != null &&
+                loadedTasks.none { it.taskId == pendingDeleteId }
+            ) {
+                pendingDeleteId = null
+            }
+
             Log.d("StudySync", "Tasks and subjects loaded")
         } catch (exception: CancellationException) {
             throw exception
@@ -79,6 +100,7 @@ fun TasksScreen(repository: StudyRepository) {
                     Button(
                         enabled = subjects.isNotEmpty() && !saving,
                         onClick = {
+                            editingId = null
                             saveError = null
                             showForm = true
                         }
@@ -92,7 +114,9 @@ fun TasksScreen(repository: StudyRepository) {
                         Text("Add a subject in the Subjects tab before creating a task.")
                     }
                 } else if (tasks.isEmpty()) {
-                    item { Text("No tasks yet. Add your first study task.") }
+                    item {
+                        Text("No tasks yet. Add your first study task.")
+                    }
                 }
 
                 items(tasks, key = { it.taskId }) { task ->
@@ -117,11 +141,41 @@ fun TasksScreen(repository: StudyRepository) {
                             }
 
                             Text("Due: ${task.dueDate}")
+
                             Text(
                                 "Priority: " + task.priority.lowercase()
                                     .replaceFirstChar { it.uppercase() }
                             )
-                            Text(if (task.completed) "Completed" else "Pending")
+
+                            Text(
+                                if (task.completed) "Completed" else "Pending"
+                            )
+
+                            Row {
+                                TextButton(
+                                    enabled = !saving,
+                                    onClick = {
+                                        editingId = task.taskId
+                                        saveError = null
+                                        showForm = true
+                                    }
+                                ) {
+                                    Text("Edit")
+                                }
+
+                                TextButton(
+                                    enabled = !saving,
+                                    onClick = {
+                                        deleteError = null
+                                        pendingDeleteId = task.taskId
+                                    }
+                                ) {
+                                    Text(
+                                        "Delete",
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -134,21 +188,41 @@ fun TasksScreen(repository: StudyRepository) {
             subjects = subjects,
             saving = saving,
             saveError = saveError,
+            initialTask = tasks.find { it.taskId == editingId },
             onDismiss = {
                 showForm = false
+                editingId = null
                 saveError = null
             },
             onSave = { draft ->
                 if (!saving) {
                     saving = true
                     saveError = null
+                    val creating = editingId == null
 
                     scope.launch {
                         try {
-                            val saved = repository.createTask(draft)
-                            tasks = tasks + saved
+                            val saved = if (creating) {
+                                repository.createTask(draft)
+                            } else {
+                                repository.updateTask(draft)
+                            }
+
+                            tasks = if (creating) {
+                                tasks + saved
+                            } else {
+                                tasks.map {
+                                    if (it.taskId == saved.taskId) saved else it
+                                }
+                            }
+
                             showForm = false
-                            Log.d("StudySync", "Task created")
+                            editingId = null
+
+                            Log.d(
+                                "StudySync",
+                                if (creating) "Task created" else "Task edited"
+                            )
                         } catch (exception: CancellationException) {
                             throw exception
                         } catch (exception: Exception) {
@@ -157,11 +231,90 @@ fun TasksScreen(repository: StudyRepository) {
                             } else {
                                 "Could not save your task. Please try again."
                             }
-                            Log.e("StudySync", "Task creation failed", exception)
+
+                            Log.e("StudySync", "Task save failed", exception)
                         } finally {
                             saving = false
                         }
                     }
+                }
+            }
+        )
+    }
+
+    val taskToDelete = tasks.find { it.taskId == pendingDeleteId }
+
+    if (taskToDelete != null && !loading && loadError == null) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!saving) {
+                    pendingDeleteId = null
+                    deleteError = null
+                }
+            },
+            title = { Text("Delete task?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Delete \"${taskToDelete.title}\"? This cannot be undone."
+                    )
+
+                    deleteError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !saving,
+                    onClick = {
+                        if (!saving) {
+                            saving = true
+                            deleteError = null
+
+                            scope.launch {
+                                try {
+                                    repository.deleteTask(taskToDelete.taskId)
+
+                                    tasks = tasks.filterNot {
+                                        it.taskId == taskToDelete.taskId
+                                    }
+
+                                    pendingDeleteId = null
+                                    Log.d("StudySync", "Task deleted")
+                                } catch (exception: CancellationException) {
+                                    throw exception
+                                } catch (exception: Exception) {
+                                    deleteError =
+                                        "Could not delete your task. Please try again."
+
+                                    Log.e(
+                                        "StudySync",
+                                        "Task deletion failed",
+                                        exception
+                                    )
+                                } finally {
+                                    saving = false
+                                }
+                            }
+                        }
+                    }
+                ) {
+                    Text(
+                        if (saving) "Deleting..." else "Delete",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !saving,
+                    onClick = {
+                        pendingDeleteId = null
+                        deleteError = null
+                    }
+                ) {
+                    Text("Cancel")
                 }
             }
         )
