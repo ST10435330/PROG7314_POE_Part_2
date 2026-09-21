@@ -9,9 +9,11 @@ interface StudyRepository {
     suspend fun getSubjects(): List<Subject>
     suspend fun getTasks(): List<StudyTask>
     suspend fun createTask(task: StudyTask): StudyTask
+    suspend fun updateTask(task: StudyTask): StudyTask
+    suspend fun deleteTask(taskId: String)
 }
 
-// Temporary implementation while the hosted API is being developed.
+// Temporary local implementation until the hosted API is connected.
 class LocalStudyRepository(context: Context) : StudyRepository {
     private val subjectStorage = SubjectStorage(context.applicationContext)
     private val taskStorage = TaskStorage(context.applicationContext)
@@ -29,21 +31,7 @@ class LocalStudyRepository(context: Context) : StudyRepository {
     override suspend fun createTask(task: StudyTask): StudyTask =
         withContext(Dispatchers.IO) {
             synchronized(SubjectStorage.writeLock) {
-                val cleaned = task.copy(
-                    title = task.title.trim(),
-                    description = task.description.trim()
-                )
-
-                val validationError = TaskValidator.validate(cleaned)
-                require(validationError == null) {
-                    validationError ?: "Invalid task."
-                }
-
-                require(subjectStorage.load().any {
-                    it.subjectId == cleaned.subjectId
-                }) {
-                    "That subject is no longer available. Reload and try again."
-                }
+                val cleaned = validateTask(task)
 
                 val saved = cleaned.copy(
                     taskId = UUID.randomUUID().toString(),
@@ -55,4 +43,63 @@ class LocalStudyRepository(context: Context) : StudyRepository {
                 saved
             }
         }
+
+    override suspend fun updateTask(task: StudyTask): StudyTask =
+        withContext(Dispatchers.IO) {
+            synchronized(SubjectStorage.writeLock) {
+                val existing = taskStorage.load()
+
+                require(existing.any { it.taskId == task.taskId }) {
+                    "This task no longer exists."
+                }
+
+                val updated = validateTask(task)
+
+                taskStorage.save(
+                    existing.map {
+                        if (it.taskId == updated.taskId) updated else it
+                    }
+                )
+
+                updated
+            }
+        }
+
+    override suspend fun deleteTask(taskId: String) {
+        withContext(Dispatchers.IO) {
+            synchronized(SubjectStorage.writeLock) {
+                val existing = taskStorage.load()
+
+                require(existing.any { it.taskId == taskId }) {
+                    "This task no longer exists."
+                }
+
+                taskStorage.save(
+                    existing.filterNot { it.taskId == taskId }
+                )
+            }
+        }
+    }
+
+    private fun validateTask(task: StudyTask): StudyTask {
+        val cleaned = task.copy(
+            title = task.title.trim(),
+            description = task.description.trim(),
+            dueDate = task.dueDate.trim()
+        )
+
+        val error = TaskValidator.validate(cleaned)
+
+        require(error == null) {
+            error ?: "Invalid task."
+        }
+
+        require(subjectStorage.load().any {
+            it.subjectId == cleaned.subjectId
+        }) {
+            "That subject is no longer available. Reload and try again."
+        }
+
+        return cleaned
+    }
 }
