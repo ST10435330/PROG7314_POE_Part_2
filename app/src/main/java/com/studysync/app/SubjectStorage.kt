@@ -5,13 +5,17 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class SubjectStorage(context: Context) {
-
     private val preferences = context.applicationContext
         .getSharedPreferences("studysync", Context.MODE_PRIVATE)
 
+    private val taskStorage = TaskStorage(context)
+
+    internal companion object {
+        val writeLock = Any()
+    }
+
     fun load(): List<Subject> {
-        val saved = preferences.getString("subjects", "[]") ?: "[]"
-        val array = JSONArray(saved)
+        val array = JSONArray(preferences.getString("subjects", "[]") ?: "[]")
 
         return List(array.length()) { index ->
             val item = array.getJSONObject(index)
@@ -25,20 +29,34 @@ class SubjectStorage(context: Context) {
     }
 
     fun save(subjects: List<Subject>) {
-        val array = JSONArray()
+        synchronized(writeLock) {
+            val remainingIds = subjects.map { it.subjectId }.toSet()
+            val removedIds = load()
+                .map { it.subjectId }
+                .filterNot { it in remainingIds }
+                .toSet()
 
-        subjects.forEach { subject ->
-            val item = JSONObject().apply {
-                put("subjectId", subject.subjectId)
-                put("name", subject.name)
-                put("lecturerName", subject.lecturerName)
+            if (removedIds.isNotEmpty()) {
+                val hasLinkedTasks = taskStorage.load().any {
+                    it.subjectId in removedIds
+                }
+
+                require(!hasLinkedTasks) {
+                    "Delete or move this subject's tasks first."
+                }
             }
 
-            array.put(item)
-        }
+            val array = JSONArray()
 
-        preferences.edit()
-            .putString("subjects", array.toString())
-            .apply()
+            subjects.forEach { subject ->
+                array.put(JSONObject().apply {
+                    put("subjectId", subject.subjectId)
+                    put("name", subject.name)
+                    put("lecturerName", subject.lecturerName)
+                })
+            }
+
+            preferences.edit().putString("subjects", array.toString()).apply()
+        }
     }
 }
