@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import kotlinx.coroutines.delay
 
 @Composable
 fun TasksScreen(repository: StudyRepository) {
@@ -32,7 +34,32 @@ fun TasksScreen(repository: StudyRepository) {
     var saving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
     var deleteError by remember { mutableStateOf<String?>(null) }
+    var filter by rememberSaveable {
+        mutableStateOf(TaskFilter.ALL)
+    }
+    var sort by rememberSaveable {
+        mutableStateOf(TaskSort.DUE_DATE)
+    }
+    var selectedSubjectId by rememberSaveable {
+        mutableStateOf("")
+    }
+    var showFilters by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var completionError by remember {
+        mutableStateOf<Pair<String, String>?>(null)
+    }
+    var today by remember {
+        mutableStateOf(LocalDate.now())
+    }
 
+    // Refresh date-dependent labels if the screen stays open overnight.
+    LaunchedEffect(Unit) {
+        while (true) {
+            today = LocalDate.now()
+            delay(60_000L)
+        }
+    }
     LaunchedEffect(repository, reloadKey) {
         loading = true
         loadError = null
@@ -43,6 +70,11 @@ fun TasksScreen(repository: StudyRepository) {
 
             subjects = loadedSubjects
             tasks = loadedTasks
+            if (selectedSubjectId.isNotBlank() &&
+                loadedSubjects.none { it.subjectId == selectedSubjectId }
+            ) {
+                selectedSubjectId = ""
+            }
 
             // A previously selected task may have been removed.
             if (editingId != null &&
@@ -68,6 +100,13 @@ fun TasksScreen(repository: StudyRepository) {
             loading = false
         }
     }
+    val visibleTasks = TaskLogic.select(
+        tasks = tasks,
+        filter = filter,
+        sort = sort,
+        subjectId = selectedSubjectId,
+        today = today
+    )
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -96,18 +135,47 @@ fun TasksScreen(repository: StudyRepository) {
             }
 
             else -> {
-                item {
-                    Button(
-                        enabled = subjects.isNotEmpty() && !saving,
-                        onClick = {
-                            editingId = null
-                            saveError = null
-                            showForm = true
-                        }
-                    ) {
-                        Text("Add task")
+                    item {
+                        TaskProgressPanel(
+                            tasks = tasks,
+                            subjects = subjects
+                        )
                     }
-                }
+
+                    item {
+                        TextButton(
+                            enabled = !saving,
+                            onClick = { showFilters = true }
+                        ) {
+                            Text("Filter and sort")
+                        }
+
+                        Text(
+                            "${visibleTasks.size} of ${tasks.size} tasks shown" +
+                                    " · ${filter.label}"
+                        )
+                    }
+
+                    if (saving && !showForm && pendingDeleteId == null) {
+                        item {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    item {
+                        Button(
+                            enabled = subjects.isNotEmpty() && !saving,
+                            onClick = {
+                                editingId = null
+                                saveError = null
+                                showForm = true
+                            }
+                        ) {
+                            Text("Add task")
+                        }
+                    }
 
                 if (subjects.isEmpty()) {
                     item {
@@ -117,9 +185,13 @@ fun TasksScreen(repository: StudyRepository) {
                     item {
                         Text("No tasks yet. Add your first study task.")
                     }
+                } else if (visibleTasks.isEmpty()) {
+                    item {
+                        Text("No tasks match your filters.")
+                    }
                 }
 
-                items(tasks, key = { it.taskId }) { task ->
+                items(visibleTasks, key = { it.taskId }) { task ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier.padding(16.dp),
@@ -150,6 +222,77 @@ fun TasksScreen(repository: StudyRepository) {
                             Text(
                                 if (task.completed) "Completed" else "Pending"
                             )
+
+                            if (TaskLogic.isOverdue(task, today)) {
+                                Text(
+                                    "Overdue",
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+
+                            TextButton(
+                                enabled = !saving,
+                                onClick = {
+                                    if (!saving) {
+                                        saving = true
+                                        completionError = null
+
+                                        scope.launch {
+                                            try {
+                                                val updated = repository.updateTask(
+                                                    task.copy(
+                                                        completed = !task.completed
+                                                    )
+                                                )
+
+                                                tasks = tasks.map {
+                                                    if (it.taskId == updated.taskId) {
+                                                        updated
+                                                    } else {
+                                                        it
+                                                    }
+                                                }
+
+                                                Log.d(
+                                                    "StudySync",
+                                                    if (updated.completed) {
+                                                        "Task completed"
+                                                    } else {
+                                                        "Task reopened"
+                                                    }
+                                                )
+                                            } catch (exception: CancellationException) {
+                                                throw exception
+                                            } catch (exception: Exception) {
+                                                completionError = task.taskId to
+                                                        "Could not update this task. Try again."
+
+                                                Log.e(
+                                                    "StudySync",
+                                                    "Task completion update failed",
+                                                    exception
+                                                )
+                                            } finally {
+                                                saving = false
+                                            }
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    if (task.completed) "Reopen task"
+                                    else "Mark complete"
+                                )
+                            }
+
+                            completionError?.let { (failedId, message) ->
+                                if (failedId == task.taskId) {
+                                    Text(
+                                        message,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
 
                             Row {
                                 TextButton(
@@ -239,6 +382,24 @@ fun TasksScreen(repository: StudyRepository) {
                     }
                 }
             }
+        )
+    }
+
+    if (showFilters && !loading && loadError == null) {
+        TaskFiltersDialog(
+            subjects = subjects,
+            selectedSubjectId = selectedSubjectId,
+            filter = filter,
+            sort = sort,
+            onSubjectChange = { selectedSubjectId = it },
+            onFilterChange = { filter = it },
+            onSortChange = { sort = it },
+            onReset = {
+                selectedSubjectId = ""
+                filter = TaskFilter.ALL
+                sort = TaskSort.DUE_DATE
+            },
+            onDismiss = { showFilters = false }
         )
     }
 
