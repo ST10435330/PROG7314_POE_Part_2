@@ -16,6 +16,15 @@ A native Kotlin Android student task planner for PROG7314.
 .\gradlew.bat signingReport
 ```
 
+Google sign-in uses Firebase Authentication and Android Credential Manager.
+Register `com.studysync.app` in the shared Firebase project, add the local
+debug signing fingerprints, enable Google sign-in, and place the downloaded
+configuration at `app/google-services.json`.
+
+GitHub Actions restores this file from the `GOOGLE_SERVICES_JSON`
+repository secret. Subjects and tasks currently use temporary local
+storage separated by Firebase user ID; hosted API integration follows.
+
 
 
 
