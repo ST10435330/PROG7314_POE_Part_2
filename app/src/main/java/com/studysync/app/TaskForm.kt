@@ -16,16 +16,25 @@ fun TaskForm(
     saving: Boolean,
     saveError: String?,
     onDismiss: () -> Unit,
-    onSave: (StudyTask) -> Unit
+    onSave: (StudyTask) -> Unit,
+    initialTask: StudyTask? = null
 ) {
-    var title by rememberSaveable { mutableStateOf("") }
-    var description by rememberSaveable { mutableStateOf("") }
-    var subjectId by rememberSaveable { mutableStateOf("") }
-    var dueDate by rememberSaveable {
-        mutableStateOf(LocalDate.now().toString())
+    var title by rememberSaveable(initialTask?.taskId) {
+        mutableStateOf(initialTask?.title ?: "")
     }
-    var priority by rememberSaveable { mutableStateOf("MEDIUM") }
-    var validationError by rememberSaveable {
+    var description by rememberSaveable(initialTask?.taskId) {
+        mutableStateOf(initialTask?.description ?: "")
+    }
+    var subjectId by rememberSaveable(initialTask?.taskId) {
+        mutableStateOf(initialTask?.subjectId ?: "")
+    }
+    var dueDate by rememberSaveable(initialTask?.taskId) {
+        mutableStateOf(initialTask?.dueDate ?: LocalDate.now().toString())
+    }
+    var priority by rememberSaveable(initialTask?.taskId) {
+        mutableStateOf(initialTask?.priority ?: "MEDIUM")
+    }
+    var validationError by rememberSaveable(initialTask?.taskId) {
         mutableStateOf<String?>(null)
     }
 
@@ -33,7 +42,9 @@ fun TaskForm(
         onDismissRequest = {
             if (!saving) onDismiss()
         },
-        title = { Text("Add task") },
+        title = {
+            Text(if (initialTask == null) "Add task" else "Edit task")
+        },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -112,7 +123,7 @@ fun TaskForm(
             TextButton(
                 enabled = !saving,
                 onClick = {
-                    val task = StudyTask(
+                    val task = (initialTask ?: StudyTask()).copy(
                         subjectId = subjectId,
                         title = title.trim(),
                         description = description.trim(),
