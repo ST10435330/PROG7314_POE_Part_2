@@ -44,8 +44,8 @@ fun StudySyncScreen(userId: String,
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val repository: StudyRepository = remember(context, userId) {
-        LocalStudyRepository(context.applicationContext, userId = userId)
+    val repository: StudyRepository = remember(userId) {
+        ApiStudyRepository(userId)
     }
 
     val settingsStorage = remember(context) {
@@ -143,7 +143,7 @@ fun StudySyncScreen(userId: String,
                             settings = currentSettings
                         )
 
-                        1 -> SubjectsScreen(userId = userId)
+                        1 -> SubjectsScreen(repository = repository)
 
                         2 -> SettingsScreen(
                             settings = currentSettings,

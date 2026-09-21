@@ -97,7 +97,10 @@ fun TasksScreen(
         } catch (exception: CancellationException) {
             throw exception
         } catch (exception: Exception) {
-            loadError = "Could not load your tasks. Please try again."
+            loadError = apiErrorMessage(
+                exception,
+                "Could not load your tasks. Please try again."
+            )
             Log.e("StudySync", "Task loading failed", exception)
         } finally {
             loading = false
@@ -151,6 +154,15 @@ fun TasksScreen(
                             onClick = { showFilters = true }
                         ) {
                             Text("Filter and sort")
+                        }
+                        TextButton(
+                            enabled = !saving,
+                            onClick = {
+                                completionError = null
+                                reloadKey++
+                            }
+                        ) {
+                            Text("Refresh")
                         }
 
                         Text(
@@ -373,11 +385,10 @@ fun TasksScreen(
                         } catch (exception: CancellationException) {
                             throw exception
                         } catch (exception: Exception) {
-                            saveError = if (exception is IllegalArgumentException) {
-                                exception.message ?: "Check your task details."
-                            } else {
+                            saveError = apiErrorMessage(
+                                exception,
                                 "Could not save your task. Please try again."
-                            }
+                            )
 
                             Log.e("StudySync", "Task save failed", exception)
                         } finally {
@@ -450,8 +461,10 @@ fun TasksScreen(
                                 } catch (exception: CancellationException) {
                                     throw exception
                                 } catch (exception: Exception) {
-                                    deleteError =
+                                    deleteError = apiErrorMessage(
+                                        exception,
                                         "Could not delete your task. Please try again."
+                                    )
 
                                     Log.e(
                                         "StudySync",

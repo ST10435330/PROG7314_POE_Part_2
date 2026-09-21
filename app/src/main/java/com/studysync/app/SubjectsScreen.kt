@@ -10,24 +10,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import java.util.UUID
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 @Composable
-fun SubjectsScreen(userId : String) {
-    val context = LocalContext.current
-    val storage = remember(context, userId) {
-        SubjectStorage(context, userId)
-    }
-
-    val initialLoad = remember {
-        runCatching { storage.load() }
-    }
+fun SubjectsScreen(repository: StudyRepository) {
+    val scope = rememberCoroutineScope()
 
     var subjects by remember {
-        mutableStateOf(initialLoad.getOrDefault(emptyList()))
+        mutableStateOf<List<Subject>>(emptyList())
     }
+    var loading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var reloadKey by remember { mutableIntStateOf(0) }
 
     var showForm by rememberSaveable { mutableStateOf(false) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -37,29 +33,36 @@ fun SubjectsScreen(userId : String) {
 
     var name by rememberSaveable { mutableStateOf("") }
     var lecturerName by rememberSaveable { mutableStateOf("") }
-    var formError by rememberSaveable {
-        mutableStateOf<String?>(null)
-    }
-    var screenError by remember {
-        mutableStateOf<String?>(null)
-    }
+    var formError by rememberSaveable { mutableStateOf<String?>(null) }
 
-    fun saveSubjects(updated: List<Subject>): Boolean {
-        return try {
-            val sorted = updated.sortedBy { it.name.lowercase() }
+    var saving by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
 
-            storage.save(sorted)
-            subjects = sorted
-            screenError = null
-            true
-        } catch (exception: Exception) {
-            screenError = if (exception is IllegalArgumentException) {
-                exception.message ?: "Could not save your changes."
-            } else {
-                "Could not save your changes. Try again."
+    LaunchedEffect(repository, reloadKey) {
+        loading = true
+        loadError = null
+
+        try {
+            subjects = repository.getSubjects()
+
+            if (editingId != null &&
+                subjects.none { it.subjectId == editingId }
+            ) {
+                showForm = false
+                editingId = null
             }
-            Log.e("StudySync", "Subject save failed", exception)
-            false
+
+            Log.d("StudySync", "Subjects loaded from API")
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            loadError = apiErrorMessage(
+                exception,
+                "Could not load subjects. Please try again."
+            )
+            Log.e("StudySync", "Subject loading failed", exception)
+        } finally {
+            loading = false
         }
     }
 
@@ -70,94 +73,104 @@ fun SubjectsScreen(userId : String) {
     ) {
         item {
             Text(
-                text = "My subjects",
+                "My subjects",
                 style = MaterialTheme.typography.headlineMedium
             )
         }
 
-        item {
-            Text("Manage the modules linked to your study tasks.")
-        }
-
-        if (initialLoad.isFailure) {
-            item {
-                Text(
-                    text = "Saved subjects could not be loaded. Restart the app and try again.",
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-        }
-
-        screenError?.let { message ->
-            item {
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-        }
-
-        item {
-            Button(
-                enabled = initialLoad.isSuccess,
-                onClick = {
-                    editingId = null
-                    name = ""
-                    lecturerName = ""
-                    formError = null
-                    screenError = null
-                    showForm = true
+        when {
+            loading -> {
+                item {
+                    CircularProgressIndicator()
+                    Text("Loading subjects...")
                 }
-            ) {
-                Text("Add subject")
             }
-        }
 
-        if (subjects.isEmpty() && initialLoad.isSuccess) {
-            item {
-                Text("No subjects yet.")
-            }
-        }
-
-        items(subjects, key = { it.subjectId }) { subject ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+            loadError != null -> {
+                item {
                     Text(
-                        text = subject.name,
-                        style = MaterialTheme.typography.titleMedium
+                        loadError ?: "",
+                        color = MaterialTheme.colorScheme.error
                     )
-
-                    if (subject.lecturerName.isNotBlank()) {
-                        Text(subject.lecturerName)
+                    TextButton(onClick = { reloadKey++ }) {
+                        Text("Retry")
                     }
+                }
+            }
 
-                    Row {
-                        TextButton(
+            else -> {
+                item {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            enabled = !saving,
                             onClick = {
-                                editingId = subject.subjectId
-                                name = subject.name
-                                lecturerName = subject.lecturerName
+                                editingId = null
+                                name = ""
+                                lecturerName = ""
                                 formError = null
-                                screenError = null
                                 showForm = true
                             }
                         ) {
-                            Text("Edit")
+                            Text("Add subject")
                         }
 
                         TextButton(
-                            onClick = {
-                                screenError = null
-                                pendingDeleteId = subject.subjectId
-                            }
+                            enabled = !saving,
+                            onClick = { reloadKey++ }
+                        ) {
+                            Text("Refresh")
+                        }
+                    }
+                }
+
+                if (subjects.isEmpty()) {
+                    item { Text("No subjects yet.") }
+                }
+
+                items(subjects, key = { it.subjectId }) { subject ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = "Delete",
-                                color = MaterialTheme.colorScheme.error
+                                subject.name,
+                                style = MaterialTheme.typography.titleMedium
                             )
+
+                            if (subject.lecturerName.isNotBlank()) {
+                                Text(subject.lecturerName)
+                            }
+
+                            Row {
+                                TextButton(
+                                    enabled = !saving,
+                                    onClick = {
+                                        editingId = subject.subjectId
+                                        name = subject.name
+                                        lecturerName = subject.lecturerName
+                                        formError = null
+                                        showForm = true
+                                    }
+                                ) {
+                                    Text("Edit")
+                                }
+
+                                TextButton(
+                                    enabled = !saving,
+                                    onClick = {
+                                        deleteError = null
+                                        pendingDeleteId = subject.subjectId
+                                    }
+                                ) {
+                                    Text(
+                                        "Delete",
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -165,20 +178,17 @@ fun SubjectsScreen(userId : String) {
         }
     }
 
-    if (showForm) {
+    if (showForm && !loading && loadError == null) {
         AlertDialog(
-            onDismissRequest = { showForm = false },
+            onDismissRequest = {
+                if (!saving) showForm = false
+            },
             title = {
-                Text(
-                    if (editingId == null) "Add subject"
-                    else "Edit subject"
-                )
+                Text(if (editingId == null) "Add subject" else "Edit subject")
             },
             text = {
                 Column(
-                    modifier = Modifier.verticalScroll(
-                        rememberScrollState()
-                    ),
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedTextField(
@@ -188,6 +198,7 @@ fun SubjectsScreen(userId : String) {
                             formError = null
                         },
                         label = { Text("Subject name") },
+                        enabled = !saving,
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -199,63 +210,76 @@ fun SubjectsScreen(userId : String) {
                             formError = null
                         },
                         label = { Text("Lecturer name (optional)") },
+                        enabled = !saving,
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    formError?.let { message ->
-                        Text(
-                            text = message,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                    formError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
                     }
                 }
             },
             confirmButton = {
                 TextButton(
+                    enabled = !saving,
                     onClick = {
                         formError = SubjectValidator.validate(
-                            name = name,
-                            lecturerName = lecturerName,
-                            existingSubjects = subjects,
-                            editingSubjectId = editingId
+                            name,
+                            lecturerName,
+                            subjects,
+                            editingId
                         )
 
-                        if (formError == null) {
-                            val subject = Subject(
-                                subjectId = editingId
-                                    ?: UUID.randomUUID().toString(),
+                        if (formError == null && !saving) {
+                            val draft = Subject(
+                                subjectId = editingId ?: "",
                                 name = name.trim(),
                                 lecturerName = lecturerName.trim()
                             )
 
-                            val updated = if (editingId == null) {
-                                subjects + subject
-                            } else {
-                                subjects.map {
-                                    if (it.subjectId == editingId) subject
-                                    else it
-                                }
-                            }
+                            saving = true
 
-                            if (saveSubjects(updated)) {
-                                Log.d(
-                                    "StudySync",
-                                    if (editingId == null) "Subject added"
-                                    else "Subject edited"
-                                )
-                                showForm = false
-                            } else {
-                                formError = "Could not save. Try again."
+                            scope.launch {
+                                try {
+                                    val saved = if (draft.subjectId.isBlank()) {
+                                        repository.createSubject(draft)
+                                    } else {
+                                        repository.updateSubject(draft)
+                                    }
+
+                                    subjects = (
+                                            subjects.filterNot {
+                                                it.subjectId == saved.subjectId
+                                            } + saved
+                                            ).sortedBy { it.name.lowercase() }
+
+                                    showForm = false
+                                    editingId = null
+                                    Log.d("StudySync", "Subject saved through API")
+                                } catch (exception: CancellationException) {
+                                    throw exception
+                                } catch (exception: Exception) {
+                                    formError = apiErrorMessage(
+                                        exception,
+                                        "Could not save this subject."
+                                    )
+                                    Log.e("StudySync", "Subject save failed", exception)
+                                } finally {
+                                    saving = false
+                                }
                             }
                         }
                     }
                 ) {
-                    Text("Save")
+                    Text(if (saving) "Saving..." else "Save")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showForm = false }) {
+                TextButton(
+                    enabled = !saving,
+                    onClick = { showForm = false }
+                ) {
                     Text("Cancel")
                 }
             }
@@ -266,37 +290,69 @@ fun SubjectsScreen(userId : String) {
         it.subjectId == pendingDeleteId
     }
 
-    if (subjectToDelete != null) {
+    if (subjectToDelete != null && !loading && loadError == null) {
         AlertDialog(
-            onDismissRequest = { pendingDeleteId = null },
+            onDismissRequest = {
+                if (!saving) pendingDeleteId = null
+            },
             title = { Text("Delete subject?") },
             text = {
-                Text(
-                    "Delete ${subjectToDelete.name}? This cannot be undone."
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Delete ${subjectToDelete.name}? This cannot be undone."
+                    )
+
+                    deleteError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
+                    enabled = !saving,
                     onClick = {
-                        val updated = subjects.filterNot {
-                            it.subjectId == subjectToDelete.subjectId
-                        }
+                        if (!saving) {
+                            saving = true
+                            deleteError = null
 
-                        if (saveSubjects(updated)) {
-                            Log.d("StudySync", "Subject deleted")
-                        }
+                            scope.launch {
+                                try {
+                                    repository.deleteSubject(
+                                        subjectToDelete.subjectId
+                                    )
 
-                        pendingDeleteId = null
+                                    subjects = subjects.filterNot {
+                                        it.subjectId == subjectToDelete.subjectId
+                                    }
+
+                                    pendingDeleteId = null
+                                    Log.d("StudySync", "Subject deleted through API")
+                                } catch (exception: CancellationException) {
+                                    throw exception
+                                } catch (exception: Exception) {
+                                    deleteError = apiErrorMessage(
+                                        exception,
+                                        "Could not delete this subject."
+                                    )
+                                    Log.e("StudySync", "Subject deletion failed", exception)
+                                } finally {
+                                    saving = false
+                                }
+                            }
+                        }
                     }
                 ) {
                     Text(
-                        text = "Delete",
+                        if (saving) "Deleting..." else "Delete",
                         color = MaterialTheme.colorScheme.error
                     )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDeleteId = null }) {
+                TextButton(
+                    enabled = !saving,
+                    onClick = { pendingDeleteId = null }
+                ) {
                     Text("Cancel")
                 }
             }
