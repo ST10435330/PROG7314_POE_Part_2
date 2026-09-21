@@ -4,9 +4,9 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-class TaskStorage(context: Context) {
+class TaskStorage(context: Context, userId : String) {
     private val preferences = context.applicationContext
-        .getSharedPreferences("studysync", Context.MODE_PRIVATE)
+        .getSharedPreferences("studysync_$userId", Context.MODE_PRIVATE)
 
     fun load(): List<StudyTask> {
         val array = JSONArray(preferences.getString("tasks", "[]") ?: "[]")

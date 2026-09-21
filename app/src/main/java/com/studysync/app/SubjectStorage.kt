@@ -4,11 +4,11 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-class SubjectStorage(context: Context) {
+class SubjectStorage(context: Context, userId: String) {
     private val preferences = context.applicationContext
-        .getSharedPreferences("studysync", Context.MODE_PRIVATE)
+        .getSharedPreferences("studysync_$userId", Context.MODE_PRIVATE)
 
-    private val taskStorage = TaskStorage(context)
+    private val taskStorage = TaskStorage(context, userId)
 
     internal companion object {
         val writeLock = Any()

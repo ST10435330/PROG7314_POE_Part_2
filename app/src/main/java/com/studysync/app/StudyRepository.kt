@@ -14,9 +14,9 @@ interface StudyRepository {
 }
 
 // Temporary local implementation until the hosted API is connected.
-class LocalStudyRepository(context: Context) : StudyRepository {
-    private val subjectStorage = SubjectStorage(context.applicationContext)
-    private val taskStorage = TaskStorage(context.applicationContext)
+class LocalStudyRepository(context: Context, userId: String) : StudyRepository {
+    private val subjectStorage = SubjectStorage(context.applicationContext, userId)
+    private val taskStorage = TaskStorage(context.applicationContext, userId)
 
     override suspend fun getSubjects(): List<Subject> =
         withContext(Dispatchers.IO) {

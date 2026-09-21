@@ -15,9 +15,11 @@ import androidx.compose.ui.unit.dp
 import java.util.UUID
 
 @Composable
-fun SubjectsScreen() {
+fun SubjectsScreen(userId : String) {
     val context = LocalContext.current
-    val storage = remember { SubjectStorage(context) }
+    val storage = remember(context, userId) {
+        SubjectStorage(context, userId)
+    }
 
     val initialLoad = remember {
         runCatching { storage.load() }

@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
                     primary = Color(0xFF2855B8)
                 )
             ) {
-                StudySyncScreen()
+                AuthScreen()
             }
         }
     }
@@ -38,12 +38,14 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StudySyncScreen() {
+fun StudySyncScreen(userId: String,
+                    userEmail: String,
+                    onSignOut: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val repository: StudyRepository = remember(context) {
-        LocalStudyRepository(context.applicationContext)
+    val repository: StudyRepository = remember(context, userId) {
+        LocalStudyRepository(context.applicationContext, userId = userId)
     }
 
     val settingsStorage = remember(context) {
@@ -76,7 +78,17 @@ fun StudySyncScreen() {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("StudySync") })
+            TopAppBar(
+                title = { Text("StudySync") },
+                actions = {
+                    TextButton(
+                        enabled = !savingSettings,
+                        onClick = onSignOut
+                    ) {
+                        Text("Sign out")
+                    }
+                }
+            )
         }
     ) { padding ->
         val currentSettings = settings
@@ -131,13 +143,14 @@ fun StudySyncScreen() {
                             settings = currentSettings
                         )
 
-                        1 -> SubjectsScreen()
+                        1 -> SubjectsScreen(userId = userId)
 
                         2 -> SettingsScreen(
                             settings = currentSettings,
                             saving = savingSettings,
                             error = saveError,
                             message = saveMessage,
+                            accountEmail = userEmail,
                             onSettingsChange = { updated ->
                                 if (!savingSettings &&
                                     updated != currentSettings

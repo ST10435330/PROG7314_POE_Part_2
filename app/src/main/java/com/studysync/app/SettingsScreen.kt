@@ -14,7 +14,8 @@ fun SettingsScreen(
     saving: Boolean,
     error: String?,
     message: String?,
-    onSettingsChange: (AppSettings) -> Unit
+    onSettingsChange: (AppSettings) -> Unit,
+    accountEmail: String = ""
 ) {
     Column(
         modifier = Modifier
@@ -27,6 +28,9 @@ fun SettingsScreen(
             "Settings",
             style = MaterialTheme.typography.headlineMedium
         )
+        if (accountEmail.isNotBlank()) {
+            Text("Signed in as $accountEmail")
+        }
 
         Text("Choose how you organise your study tasks.")
 
