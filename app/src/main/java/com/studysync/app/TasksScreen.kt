@@ -15,7 +15,10 @@ import java.time.LocalDate
 import kotlinx.coroutines.delay
 
 @Composable
-fun TasksScreen(repository: StudyRepository) {
+fun TasksScreen(
+    repository: StudyRepository,
+    settings: AppSettings
+) {
     val scope = rememberCoroutineScope()
 
     var subjects by remember { mutableStateOf<List<Subject>>(emptyList()) }
@@ -37,8 +40,8 @@ fun TasksScreen(repository: StudyRepository) {
     var filter by rememberSaveable {
         mutableStateOf(TaskFilter.ALL)
     }
-    var sort by rememberSaveable {
-        mutableStateOf(TaskSort.DUE_DATE)
+    var sort by rememberSaveable(settings.defaultSort) {
+        mutableStateOf(settings.defaultSort)
     }
     var selectedSubjectId by rememberSaveable {
         mutableStateOf("")
@@ -332,6 +335,7 @@ fun TasksScreen(repository: StudyRepository) {
             saving = saving,
             saveError = saveError,
             initialTask = tasks.find { it.taskId == editingId },
+            defaultPriority = settings.defaultPriority,
             onDismiss = {
                 showForm = false
                 editingId = null
@@ -397,7 +401,7 @@ fun TasksScreen(repository: StudyRepository) {
             onReset = {
                 selectedSubjectId = ""
                 filter = TaskFilter.ALL
-                sort = TaskSort.DUE_DATE
+                sort = settings.defaultSort
             },
             onDismiss = { showFilters = false }
         )

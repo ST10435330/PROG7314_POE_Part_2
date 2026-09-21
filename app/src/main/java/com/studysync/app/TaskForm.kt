@@ -17,7 +17,8 @@ fun TaskForm(
     saveError: String?,
     onDismiss: () -> Unit,
     onSave: (StudyTask) -> Unit,
-    initialTask: StudyTask? = null
+    initialTask: StudyTask? = null,
+    defaultPriority: String = "MEDIUM"
 ) {
     var title by rememberSaveable(initialTask?.taskId) {
         mutableStateOf(initialTask?.title ?: "")
@@ -32,7 +33,7 @@ fun TaskForm(
         mutableStateOf(initialTask?.dueDate ?: LocalDate.now().toString())
     }
     var priority by rememberSaveable(initialTask?.taskId) {
-        mutableStateOf(initialTask?.priority ?: "MEDIUM")
+        mutableStateOf(initialTask?.priority ?: defaultPriority)
     }
     var validationError by rememberSaveable(initialTask?.taskId) {
         mutableStateOf<String?>(null)
