@@ -56,4 +56,37 @@ class SubjectValidatorTest {
             SubjectValidator.validate(" prog7314 ", "", existing)
         )
     }
+
+    @Test
+    fun editingSubjectCanKeepItsOwnName() {
+        val existing = listOf(
+            Subject(subjectId = "1", name = "PROG7314")
+        )
+
+        assertNull(
+            SubjectValidator.validate(
+                name = "PROG7314",
+                lecturerName = "Updated lecturer",
+                existingSubjects = existing,
+                editingSubjectId = "1"
+            )
+        )
+    }
+
+    @Test
+    fun editingCannotUseAnotherSubjectsName() {
+        val existing = listOf(
+            Subject(subjectId = "1", name = "PROG7314"),
+            Subject(subjectId = "2", name = "INSY7314")
+        )
+
+        assertNotNull(
+            SubjectValidator.validate(
+                name = " insy7314 ",
+                lecturerName = "",
+                existingSubjects = existing,
+                editingSubjectId = "1"
+            )
+        )
+    }
 }

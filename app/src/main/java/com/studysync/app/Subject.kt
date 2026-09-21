@@ -11,7 +11,8 @@ object SubjectValidator {
     fun validate(
         name: String,
         lecturerName: String,
-        existingSubjects: List<Subject>
+        existingSubjects: List<Subject>,
+        editingSubjectId: String? = null
     ): String? {
         val cleanName = name.trim()
 
@@ -27,9 +28,12 @@ object SubjectValidator {
             return "Lecturer names must be 80 characters or fewer."
         }
 
-        if (existingSubjects.any {
-                it.name.equals(cleanName, ignoreCase = true)
-            }) {
+        val duplicateExists = existingSubjects.any {
+            it.subjectId != editingSubjectId &&
+                    it.name.equals(cleanName, ignoreCase = true)
+        }
+
+        if (duplicateExists) {
             return "That subject already exists."
         }
 
