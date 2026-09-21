@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 
 class MainActivity : ComponentActivity() {
 
@@ -36,6 +37,10 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudySyncScreen() {
+    val context = LocalContext.current
+    val repository: StudyRepository = remember(context) {
+        LocalStudyRepository(context.applicationContext)
+    }
     var selectedTab by rememberSaveable {
         mutableIntStateOf(0)
     }
@@ -65,19 +70,7 @@ fun StudySyncScreen() {
             }
 
             if (selectedTab == 0) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "My tasks",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-
-                    Text("Keep your study tasks in one place.")
-                    HorizontalDivider()
-                    Text("Your task list is empty.")
-                }
+                TasksScreen(repository)
             } else {
                 SubjectsScreen()
             }
