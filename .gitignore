@@ -1,0 +1,15 @@
+.gradle/
+.idea/
+**/build/
+local.properties
+studysync.properties
+app/google-services.json
+server/node_modules/
+server/.env
+**/*service-account*.json
+**/*firebase-adminsdk*.json
+*.jks
+*.keystore
+*.download
+*.log
+.DS_Store
