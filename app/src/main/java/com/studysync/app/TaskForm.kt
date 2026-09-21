@@ -153,7 +153,7 @@ fun TaskForm(
 }
 
 @Composable
-private fun TaskChoice(
+internal fun TaskChoice(
     label: String,
     selectedText: String,
     choices: List<Pair<String, String>>,
