@@ -279,8 +279,10 @@ fun TasksScreen(
                                             } catch (exception: CancellationException) {
                                                 throw exception
                                             } catch (exception: Exception) {
-                                                completionError = task.taskId to
-                                                        "Could not update this task. Try again."
+                                                completionError = task.taskId to apiErrorMessage(
+                                                    exception,
+                                                    "Could not update this task. Please refresh and try again."
+                                                )
 
                                                 Log.e(
                                                     "StudySync",
