@@ -26,7 +26,7 @@ API Video Demonstration	           ->	https://youtu.be/jVKDiaOgvVY
 ## Features and rubric coverage
 
 | Part 2 criterion | StudySync implementation or required evidence |
-| --- | ---: | --- |
+| --- | --- |
 | Runs on a mobile device | Native Android app; demonstrate the latest build running on a physical phone. |
 | SSO sign-in | Google sign-in through Firebase Authentication; first sign-in creates the account, with returning login and sign-out. |
 | Settings menu | Default task priority and sorting preference, saved on the device and used by the task screen. |
