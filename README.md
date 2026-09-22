@@ -25,20 +25,20 @@ API Video Demonstration	           ->	https://youtu.be/jVKDiaOgvVY
 
 ## Features and rubric coverage
 
-| Part 2 criterion | Marks | StudySync implementation or required evidence |
+| Part 2 criterion | StudySync implementation or required evidence |
 | --- | ---: | --- |
-| Runs on a mobile device | 5 | Native Android app; demonstrate the latest build running on a physical phone. |
-| SSO sign-in | 10 | Google sign-in through Firebase Authentication; first sign-in creates the account, with returning login and sign-out. |
-| Settings menu | 10 | Default task priority and sorting preference, saved on the device and used by the task screen. |
-| REST API creation | 10 | Express API with Firebase token verification, validation and Firestore persistence. |
-| REST API integration | 10 | Retrofit and OkHttp send authenticated requests to create, load, update and delete subjects and tasks. |
-| User-defined feature 1 | 10 | Subject and task management, including editing, deletion and assigning tasks to subjects. |
-| User-defined feature 2 | 10 | Due dates, priorities, overdue labels, filtering by subject/status and sorting by date, priority or title. |
-| User-defined feature 3 | 10 | Complete or reopen tasks, with overall and per-subject completion progress. |
-| User interface | 10 | Compose Material 3 screens, consistent navigation, input validation, loading indicators and error/retry feedback. |
-| GitHub, README and automated testing | 10 | Source history, this README, Android JUnit tests and Node tests run through GitHub Actions. |
-| Demonstration video | 5 | Narrated physical-phone demonstration linked above; include authentication and cloud data verification. |
-| **Total** | **100** | Coverage describes the prototype; marks depend on implementation quality and submitted evidence. |
+| Runs on a mobile device | Native Android app; demonstrate the latest build running on a physical phone. |
+| SSO sign-in | Google sign-in through Firebase Authentication; first sign-in creates the account, with returning login and sign-out. |
+| Settings menu | Default task priority and sorting preference, saved on the device and used by the task screen. |
+| REST API creation | Express API with Firebase token verification, validation and Firestore persistence. |
+| REST API integration | Retrofit and OkHttp send authenticated requests to create, load, update and delete subjects and tasks. |
+| User-defined feature 1 | Subject and task management, including editing, deletion and assigning tasks to subjects. |
+| User-defined feature 2 | Due dates, priorities, overdue labels, filtering by subject/status and sorting by date, priority or title. |
+| User-defined feature 3 | Complete or reopen tasks, with overall and per-subject completion progress. |
+| User interface | Compose Material 3 screens, consistent navigation, input validation, loading indicators and error/retry feedback. |
+| GitHub, README and automated testing | Source history, this README, Android JUnit tests and Node tests run through GitHub Actions. |
+| Demonstration video | Narrated physical-phone demonstration linked above; include authentication and cloud data verification. |
+
 
 ## Architecture and design
 
