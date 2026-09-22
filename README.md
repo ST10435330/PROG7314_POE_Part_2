@@ -5,10 +5,15 @@ StudySync is a native Kotlin Android study planner for **PROG7314 POE Part 2**. 
 ## Project links
 
 GitHub Repository 		           ->	https://github.com/ST10435330/PROG7314_POE_Part_2
+
 GitHub build and test workflows    ->	https://github.com/ST10435330/PROG7314_POE_Part_2/actions
+
 Hosted API Health check	           ->	https://prog7314-poe-part-2.onrender.com/api/health
+
 YouTube demonstration 	           ->	https://youtu.be/d-Y73tCCgLY
+
 API Video Demonstration	           ->	https://youtu.be/jVKDiaOgvVY
+
 
 
 ## Group contributions
