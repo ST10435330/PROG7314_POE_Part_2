@@ -21,7 +21,7 @@ API Video Demonstration	           ->	https://youtu.be/jVKDiaOgvVY
 | Member | Contribution |
 | --- | --- |
 | Antonio Bechev — ST10435330 | Android application, interface, app features and integration with Firebase Authentication and the hosted API. |
-| [GROUP MEMBER NAME AND STUDENT NUMBER] | Created the custom REST API and Cloud Firestore database. |
+| Sive Sikutshwa — ST10061605 | Created the custom REST API and Cloud Firestore database. |
 
 ## Features and rubric coverage
 
